@@ -13,6 +13,7 @@ import (
 
 	"github.com/markbates/goth"
 	"golang.org/x/oauth2"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -30,6 +31,8 @@ func New(clientKey, secret, callbackURL string, scopes ...string) *Provider {
 		Secret:      secret,
 		CallbackURL: callbackURL,
 	}
+	p.ContextProvider = func() context.Context { return context.TODO() }
+	p.ClientProvider  = func() *http.Client { return http.DefaultClient }
 	p.config = newConfig(p, scopes)
 	return p
 }
@@ -39,6 +42,8 @@ type Provider struct {
 	ClientKey   string
 	Secret      string
 	CallbackURL string
+	ContextProvider func() context.Context
+	ClientProvider  func() *http.Client
 	config      *oauth2.Config
 }
 
@@ -67,7 +72,8 @@ func (p *Provider) FetchUser(session goth.Session) (goth.User, error) {
 		Provider:    p.Name(),
 	}
 
-	response, err := http.Get(endpointProfile + "&access_token=" + url.QueryEscape(sess.AccessToken))
+	client := p.ClientProvider()
+	response, err := client.Get(endpointProfile + "&access_token=" + url.QueryEscape(sess.AccessToken))
 	if err != nil {
 		return user, err
 	}
